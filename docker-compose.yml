@@ -1,0 +1,185 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: marketscope
+      POSTGRES_USER: marketscope
+      POSTGRES_PASSWORD: marketscope_internal
+    command:
+    - postgres
+    - -c
+    - shared_buffers=128MB
+    - -c
+    - effective_cache_size=512MB
+    - -c
+    - work_mem=4MB
+    - -c
+    - max_connections=28
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+    mem_limit: 300m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U marketscope -d marketscope
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  api:
+    image: optionedge-app:20.0
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://marketscope:marketscope_internal@postgres:5432/marketscope
+      SETTINGS_KEY_FILE: /marketscope-secrets/fernet.key
+      MALLOC_ARENA_MAX: '2'
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+    - app_secrets:/marketscope-secrets
+    tmpfs:
+    - /tmp:size=64m
+    mem_limit: 220m
+  worker_market:
+    image: optionedge-app:20.0
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://marketscope:marketscope_internal@postgres:5432/marketscope
+      SETTINGS_KEY_FILE: /marketscope-secrets/fernet.key
+      MALLOC_ARENA_MAX: '2'
+      PYTHONUNBUFFERED: '1'
+      WORKER_NAME: market
+      WORKER_AGENTS: stocks,options
+      AUTO_SCHEDULER: '1'
+    command: python -m worker.runner
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+    - app_secrets:/marketscope-secrets
+    tmpfs:
+    - /tmp:size=160m
+    mem_limit: 900m
+  worker_trades:
+    image: optionedge-app:20.0
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://marketscope:marketscope_internal@postgres:5432/marketscope
+      SETTINGS_KEY_FILE: /marketscope-secrets/fernet.key
+      MALLOC_ARENA_MAX: '2'
+      PYTHONUNBUFFERED: '1'
+      WORKER_NAME: trades
+      WORKER_AGENTS: option_trades
+      AUTO_SCHEDULER: '0'
+    command: python -m worker.runner
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+    - app_secrets:/marketscope-secrets
+    tmpfs:
+    - /tmp:size=160m
+    mem_limit: 900m
+  worker_features:
+    image: optionedge-app:20.0
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://marketscope:marketscope_internal@postgres:5432/marketscope
+      SETTINGS_KEY_FILE: /marketscope-secrets/fernet.key
+      MALLOC_ARENA_MAX: '2'
+      PYTHONUNBUFFERED: '1'
+      WORKER_NAME: features
+      WORKER_AGENTS: open_interest,features,events,macro,pairs,vectors
+      AUTO_SCHEDULER: '0'
+    command: python -m worker.runner
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+    - app_secrets:/marketscope-secrets
+    tmpfs:
+    - /tmp:size=96m
+    mem_limit: 650m
+  worker_news:
+    image: optionedge-app:20.0
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://marketscope:marketscope_internal@postgres:5432/marketscope
+      SETTINGS_KEY_FILE: /marketscope-secrets/fernet.key
+      MALLOC_ARENA_MAX: '2'
+      PYTHONUNBUFFERED: '1'
+      WORKER_NAME: news
+      WORKER_AGENTS: earnings
+      AUTO_SCHEDULER: '0'
+    command: python -m worker.runner
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+    - app_secrets:/marketscope-secrets
+    tmpfs:
+    - /tmp:size=64m
+    mem_limit: 320m
+  worker_model:
+    image: optionedge-app:20.0
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://marketscope:marketscope_internal@postgres:5432/marketscope
+      SETTINGS_KEY_FILE: /marketscope-secrets/fernet.key
+      MALLOC_ARENA_MAX: '2'
+      PYTHONUNBUFFERED: '1'
+      WORKER_NAME: model
+      WORKER_AGENTS: model,pair_model,relationships,deep_relationships,fusion_model,alpha_research
+      AUTO_SCHEDULER: '0'
+    command: python -m worker.runner
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+    - app_secrets:/marketscope-secrets
+    tmpfs:
+    - /tmp:size=128m
+    mem_limit: 1300m
+  worker_inventory:
+    image: optionedge-app:20.0
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://marketscope:marketscope_internal@postgres:5432/marketscope
+      SETTINGS_KEY_FILE: /marketscope-secrets/fernet.key
+      MALLOC_ARENA_MAX: '2'
+      PYTHONUNBUFFERED: '1'
+      WORKER_NAME: inventory
+      WORKER_AGENTS: inventory
+      AUTO_SCHEDULER: '0'
+    command: python -m worker.runner
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+    - app_secrets:/marketscope-secrets
+    tmpfs:
+    - /tmp:size=32m
+    mem_limit: 180m
+  web:
+    image: optionedge-app:20.0
+    restart: always
+    environment:
+      API_URL: http://api:8000
+      MALLOC_ARENA_MAX: '2'
+    command: streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=8501
+      --server.headless=true
+    ports:
+    - 80:8501
+    depends_on:
+    - api
+    tmpfs:
+    - /tmp:size=64m
+    mem_limit: 320m
+volumes:
+  postgres_data: null
+  app_secrets: null
