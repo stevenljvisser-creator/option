@@ -1,0 +1,23 @@
+{
+  "scope": "offline mocks; no marketdata throughput or real I/O measured",
+  "results": [
+    {
+      "mode": "live_settings",
+      "mock_storage_requests": 40000,
+      "individual_settings_reads": 240000,
+      "snapshot_reads": 0,
+      "wall_seconds": 0.16641061194241047,
+      "cpu_seconds": 0.22462233999999998,
+      "request_trace_sha256": "2dbdf8bf58d8b4691efdb9a30d6248334d8fcd01038d303dedf43814d9860280"
+    },
+    {
+      "mode": "job_snapshot",
+      "mock_storage_requests": 40000,
+      "individual_settings_reads": 0,
+      "snapshot_reads": 1,
+      "wall_seconds": 0.11642922181636095,
+      "cpu_seconds": 0.172603175,
+      "request_trace_sha256": "2dbdf8bf58d8b4691efdb9a30d6248334d8fcd01038d303dedf43814d9860280"
+    }
+  ]
+}

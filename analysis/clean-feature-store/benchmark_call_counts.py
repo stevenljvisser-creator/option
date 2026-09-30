@@ -5,6 +5,7 @@ Mocks count setting lookups and requests. Timings are mock overhead, not I/O.
 import ast, io, json, time, resource, hashlib
 from pathlib import Path
 from functools import lru_cache
+from contextvars import ContextVar
 root=Path(__file__).resolve().parents[2]
 source=(root/'core/storage.py').read_text()
 names={'client','bucket_name','get_bytes','put_bytes','exists','list_keys'}
@@ -20,7 +21,8 @@ class Client:
             counts[name]=counts.get(name,0)+1
             return {'Body':io.BytesIO(b''),'Contents':[],'IsTruncated':False}
         return call
-namespace={'get_setting':setting,'_cached_client':lru_cache(maxsize=8)(lambda *args:Client())}
+namespace={'get_setting':setting,'_cached_client':lru_cache(maxsize=8)(lambda *args:Client()),
+           '_job_settings':ContextVar('offline_storage_settings',default=None)}
 exec(compile(module,str(root/'core/storage.py'),'exec'),namespace)
 results=[]
 for name,call in [('HEAD',lambda:namespace['exists']('offline')),('GET',lambda:namespace['get_bytes']('offline')),('PUT',lambda:namespace['put_bytes']('offline',b'')),('LIST',lambda:list(namespace['list_keys']('offline')))]:

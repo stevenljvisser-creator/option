@@ -68,6 +68,20 @@ def get_setting(key:str,default=None):
     finally:
         db.close()
 
+def get_storage_settings():
+    """Read only the storage configuration in one database snapshot."""
+    keys=("HETZNER_S3_ENDPOINT","HETZNER_S3_REGION","HETZNER_S3_BUCKET",
+          "HETZNER_S3_ACCESS_KEY","HETZNER_S3_SECRET_KEY")
+    db=SessionLocal()
+    try:
+        rows=db.scalars(select(AppSetting).where(AppSetting.key.in_(keys))).all()
+        return {
+            row.key:decrypt_value(row.value) if row.encrypted else row.value
+            for row in rows
+        }
+    finally:
+        db.close()
+
 def get_settings(mask_secrets=False):
     db=SessionLocal()
     try:

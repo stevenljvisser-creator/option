@@ -10,6 +10,7 @@ from core.db import SessionLocal,init_db
 from core.models import AgentConfig,AgentCursor,AgentJob,AgentCompanyProgress,ModelRun,AppSetting
 from core.massive import flat_chunks,option_underlying_series,MassiveREST
 from core.storage import put_df,put_json,get_df,get_json,exists,list_keys,put_bytes
+from core.storage import load_storage_settings,storage_settings_scope
 from core.config import (
     RAW_ROOT,TRADES_ROOT,TRADE_FEATURE_ROOT,OI_ROOT,EARNINGS_ROOT,
     SENTIMENT_ROOT,FEATURE_ROOT,MODEL_ROOT,GF_NEWS_ROOT,GF_SNAPSHOT_ROOT,RICH_NEWS_ROOT,MACRO_ROOT,
@@ -860,6 +861,11 @@ def run_sentiment(db,job,days):
 
 # ---- Derived option-level training features ----
 def run_features(db,job,days):
+    settings=load_storage_settings()
+    with storage_settings_scope(settings):
+        return _run_features(db,job,days,settings)
+
+def _run_features(db,job,days,settings):
     payload=job.payload or {}
     h=int(payload.get("horizon_minutes",30))
     workers=max(1,min(8,int(payload.get("parallel_workers",4) or 4)))
@@ -873,7 +879,8 @@ def run_features(db,job,days):
     def build_one(ticker,d):
         started=time.monotonic()
         try:
-            n=save_feature_day(ticker,d,h)
+            with storage_settings_scope(settings):
+                n=save_feature_day(ticker,d,h)
             elapsed=max(.001,time.monotonic()-started)
             return {
                 "ticker":ticker,"day":d,"rows":n,"ok":True,

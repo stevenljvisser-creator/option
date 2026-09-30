@@ -1,9 +1,39 @@
 import gzip,json,io
 from functools import lru_cache
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass,field
 import boto3
 import pandas as pd
 from botocore.config import Config
-from core.runtime_settings import get_setting
+from core.runtime_settings import get_setting,get_storage_settings
+
+@dataclass(frozen=True)
+class StorageSettings:
+    endpoint:str|None
+    region:str|None
+    bucket:str|None
+    access:str|None=field(repr=False)
+    secret:str|None=field(repr=False)
+
+_job_settings=ContextVar("storage_job_settings",default=None)
+
+def load_storage_settings():
+    values=get_storage_settings()
+    return StorageSettings(
+        values.get("HETZNER_S3_ENDPOINT"),values.get("HETZNER_S3_REGION","hel1"),
+        values.get("HETZNER_S3_BUCKET"),values.get("HETZNER_S3_ACCESS_KEY"),
+        values.get("HETZNER_S3_SECRET_KEY")
+    )
+
+@contextmanager
+def storage_settings_scope(settings):
+    """Bind a job snapshot; executor threads must enter this scope explicitly."""
+    token=_job_settings.set(settings)
+    try:
+        yield
+    finally:
+        _job_settings.reset(token)
 
 @lru_cache(maxsize=8)
 def _cached_client(endpoint,region,access,secret):
@@ -31,6 +61,11 @@ def _cached_client(endpoint,region,access,secret):
     )
 
 def client():
+    settings=_job_settings.get()
+    if settings is not None:
+        if not all([settings.endpoint,settings.bucket,settings.access,settings.secret]):
+            raise RuntimeError("Hetzner Object Storage is nog niet ingesteld via de website.")
+        return _cached_client(settings.endpoint,settings.region,settings.access,settings.secret)
     endpoint=get_setting("HETZNER_S3_ENDPOINT")
     region=get_setting("HETZNER_S3_REGION","hel1")
     bucket=get_setting("HETZNER_S3_BUCKET")
@@ -41,7 +76,8 @@ def client():
     return _cached_client(endpoint,region,access,secret)
 
 def bucket_name():
-    b=get_setting("HETZNER_S3_BUCKET")
+    settings=_job_settings.get()
+    b=settings.bucket if settings is not None else get_setting("HETZNER_S3_BUCKET")
     if not b:
         raise RuntimeError("Object Storage bucket ontbreekt.")
     return b
