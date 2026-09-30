@@ -1,0 +1,103 @@
+{
+  "scope": "offline mocks; no market records, real DB queries or network requests",
+  "source_sha256": "f6f672a292c56aae454af280bf32e58248b2101f0667d5af8a693f83fbe296fb",
+  "peak_rss_kib": 17024,
+  "results": [
+    {
+      "operation": "HEAD",
+      "operations": 1000,
+      "wall_seconds": 0.003664364106953144,
+      "cpu_seconds": 0.0036683770000000004,
+      "settings_reads": 6000,
+      "head_object": 1000
+    },
+    {
+      "operation": "HEAD",
+      "operations": 10000,
+      "wall_seconds": 0.03238237090408802,
+      "cpu_seconds": 0.032104850000000004,
+      "settings_reads": 60000,
+      "head_object": 10000
+    },
+    {
+      "operation": "HEAD",
+      "operations": 100000,
+      "wall_seconds": 0.3886921799276024,
+      "cpu_seconds": 0.315959627,
+      "settings_reads": 600000,
+      "head_object": 100000
+    },
+    {
+      "operation": "GET",
+      "operations": 1000,
+      "wall_seconds": 0.005101629998534918,
+      "cpu_seconds": 0.0029570100000000377,
+      "settings_reads": 6000,
+      "get_object": 1000
+    },
+    {
+      "operation": "GET",
+      "operations": 10000,
+      "wall_seconds": 0.031541185919195414,
+      "cpu_seconds": 0.02781816399999998,
+      "settings_reads": 60000,
+      "get_object": 10000
+    },
+    {
+      "operation": "GET",
+      "operations": 100000,
+      "wall_seconds": 0.3589070690795779,
+      "cpu_seconds": 0.352172715,
+      "settings_reads": 600000,
+      "get_object": 100000
+    },
+    {
+      "operation": "PUT",
+      "operations": 1000,
+      "wall_seconds": 0.0034515720326453447,
+      "cpu_seconds": 0.0034630130000000703,
+      "settings_reads": 6000,
+      "put_object": 1000
+    },
+    {
+      "operation": "PUT",
+      "operations": 10000,
+      "wall_seconds": 0.03272839402779937,
+      "cpu_seconds": 0.032129299000000056,
+      "settings_reads": 60000,
+      "put_object": 10000
+    },
+    {
+      "operation": "PUT",
+      "operations": 100000,
+      "wall_seconds": 0.3475837600417435,
+      "cpu_seconds": 0.33687802600000005,
+      "settings_reads": 600000,
+      "put_object": 100000
+    },
+    {
+      "operation": "LIST",
+      "operations": 1000,
+      "wall_seconds": 0.003515525022521615,
+      "cpu_seconds": 0.0035073779999998944,
+      "settings_reads": 6000,
+      "list_objects_v2": 1000
+    },
+    {
+      "operation": "LIST",
+      "operations": 10000,
+      "wall_seconds": 0.0412290261592716,
+      "cpu_seconds": 0.03806387400000011,
+      "settings_reads": 60000,
+      "list_objects_v2": 10000
+    },
+    {
+      "operation": "LIST",
+      "operations": 100000,
+      "wall_seconds": 0.4563853379804641,
+      "cpu_seconds": 0.4071100329999999,
+      "settings_reads": 600000,
+      "list_objects_v2": 100000
+    }
+  ]
+}
