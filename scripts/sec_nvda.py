@@ -147,9 +147,12 @@ if __name__=='__main__':
     try:main()
     except urllib.error.HTTPError as exc:
         output=Path('sec-nvda-output');output.mkdir(exist_ok=True)
+        body=exc.read(1024*1024)
+        if exc.headers.get('Content-Encoding','').lower()=='gzip':body=gzip.decompress(body)
+        elif exc.headers.get('Content-Encoding','').lower()=='deflate':body=zlib.decompress(body)
         evidence={'status':'failed','http_status':exc.code,'url':exc.url,
             'runner_environment':os.environ.get('RUNNER_ENVIRONMENT'),'github_run_id':os.environ.get('GITHUB_RUN_ID'),
-            'response_excerpt':exc.read(8000).decode('utf-8',errors='replace')}
+            'response_excerpt':body.decode('utf-8',errors='replace')[:8000]}
         (output/'failure.json').write_text(json.dumps(evidence,indent=2))
         LOG.error('SEC HTTP %s; diagnostic response: %s',exc.code,evidence['response_excerpt'][:1500])
         raise
