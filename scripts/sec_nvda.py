@@ -1,6 +1,6 @@
 """SEC-only NVDA acceptance test. No Hetzner, database, FMP or API key needed."""
 from __future__ import annotations
-import argparse, datetime as dt, hashlib, json, logging, os, time
+import argparse, datetime as dt, gzip, hashlib, json, logging, os, time, zlib
 from pathlib import Path
 import urllib.error, urllib.request
 from zoneinfo import ZoneInfo
@@ -28,10 +28,14 @@ class SecClient:
         for attempt in range(self.attempts):
             time.sleep(max(0.,self.interval-(time.monotonic()-self.last)))
             self.last=time.monotonic()
-            req=urllib.request.Request(url,headers={'User-Agent':self.agent,'Accept':'application/json'})
+            req=urllib.request.Request(url,headers={'User-Agent':self.agent,'Accept':'application/json','Accept-Encoding':'gzip, deflate'})
             try:
                 with urllib.request.urlopen(req,timeout=90) as response:
-                    raw=response.read();payload=json.loads(raw)
+                    raw=response.read()
+                    encoding=response.headers.get('Content-Encoding','').lower()
+                    if encoding=='gzip':raw=gzip.decompress(raw)
+                    elif encoding=='deflate':raw=zlib.decompress(raw)
+                    payload=json.loads(raw)
                     LOG.info('SEC HTTP %s: %s (%s bytes)',response.status,url,len(raw))
                     return payload,raw
             except urllib.error.HTTPError as exc:
@@ -139,4 +143,13 @@ def main():
         with open(step_summary,'a') as f:f.write(f"## SEC NVDA acceptance test\n\nSuccess: **{len(rows)} facts**, **{summary['unique_quarter_periods']} quarter periods**.\n\nParquet SHA256: `{summary['parquet_sha256']}`. Readback verified.\n")
 
 if __name__=='__main__':
-    logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s');main()
+    logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
+    try:main()
+    except urllib.error.HTTPError as exc:
+        output=Path('sec-nvda-output');output.mkdir(exist_ok=True)
+        evidence={'status':'failed','http_status':exc.code,'url':exc.url,
+            'runner_environment':os.environ.get('RUNNER_ENVIRONMENT'),'github_run_id':os.environ.get('GITHUB_RUN_ID'),
+            'response_excerpt':exc.read(8000).decode('utf-8',errors='replace')}
+        (output/'failure.json').write_text(json.dumps(evidence,indent=2))
+        LOG.error('SEC HTTP %s; diagnostic response: %s',exc.code,evidence['response_excerpt'][:1500])
+        raise
