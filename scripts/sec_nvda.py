@@ -1,12 +1,16 @@
 """SEC-only NVDA acceptance test. No Hetzner, database, FMP or API key needed."""
 from __future__ import annotations
-import argparse, datetime as dt, gzip, hashlib, json, logging, os, time, zlib
+import argparse, datetime as dt, gzip, hashlib, json, logging, os, re, time, zlib
 from pathlib import Path
 import urllib.error, urllib.request
 from zoneinfo import ZoneInfo
 
 CIK='0001045810'
-DEFAULT_AGENT='OptionEdge SEC Research/1.0 stevenljvisser-creator https://github.com/stevenljvisser-creator/option'
+def make_user_agent(email):
+    email=(email or '').strip()
+    if not re.fullmatch(r'[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+',email):
+        raise ValueError('SEC_CONTACT_EMAIL ontbreekt of bevat geen echt e-mailadres; configureer het als GitHub Actions secret of repository variable')
+    return 'OptionEdge stevenljvisser-creator/option '+email
 CONCEPTS={
     'revenue':('RevenueFromContractWithCustomerExcludingAssessedTax','Revenues','SalesRevenueNet'),
     'net_income':('NetIncomeLoss','ProfitLoss'),
@@ -36,9 +40,10 @@ class SecClient:
                     if encoding=='gzip':raw=gzip.decompress(raw)
                     elif encoding=='deflate':raw=zlib.decompress(raw)
                     payload=json.loads(raw)
-                    LOG.info('SEC HTTP %s: %s (%s bytes)',response.status,url,len(raw))
+                    LOG.info('SEC response status=%s reason=%s url=%s headers=%s bytes=%s',response.status,response.reason,url,json.dumps(dict(response.headers.items())),len(raw))
                     return payload,raw
             except urllib.error.HTTPError as exc:
+                LOG.error('SEC response status=%s reason=%s url=%s headers=%s',exc.code,exc.reason,exc.url,json.dumps(dict(exc.headers.items())))
                 if exc.code not in (403,429,500,502,503,504) or attempt==self.attempts-1:raise
                 try:delay=min(120.,max(2.**(attempt+1),float(exc.headers.get('Retry-After','0'))))
                 except ValueError:delay=2.**(attempt+1)
@@ -100,13 +105,14 @@ def records(facts,submissions,start,observed):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,default=Path('sec-nvda-output'))
     p.add_argument('--start',type=dt.date.fromisoformat,default=dt.date(2022,9,16))
-    p.add_argument('--user-agent',default=os.environ.get('SEC_USER_AGENT',DEFAULT_AGENT));a=p.parse_args()
+    a=p.parse_args()
+    agent=make_user_agent(os.environ.get('SEC_CONTACT_EMAIL'))
     if os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted':
         raise RuntimeError('Real SEC requests are restricted to a GitHub-hosted Actions runner, outside Hetzner')
     import pyarrow as pa
     import pyarrow.parquet as pq
     a.output.mkdir(parents=True,exist_ok=True)
-    client=SecClient(a.user_agent)
+    client=SecClient(agent)
     facts_url=f'https://data.sec.gov/api/xbrl/companyfacts/CIK{CIK}.json'
     submissions_url=f'https://data.sec.gov/submissions/CIK{CIK}.json'
     facts,facts_raw=client.fetch(facts_url);submissions,submissions_raw=client.fetch(submissions_url)
@@ -152,7 +158,7 @@ if __name__=='__main__':
         elif exc.headers.get('Content-Encoding','').lower()=='deflate':body=zlib.decompress(body)
         evidence={'status':'failed','http_status':exc.code,'url':exc.url,
             'runner_environment':os.environ.get('RUNNER_ENVIRONMENT'),'github_run_id':os.environ.get('GITHUB_RUN_ID'),
-            'response_excerpt':body.decode('utf-8',errors='replace')[:8000]}
+            'headers':dict(exc.headers.items()),'response_excerpt':body.decode('utf-8',errors='replace')[:8000]}
         (output/'failure.json').write_text(json.dumps(evidence,indent=2))
         LOG.error('SEC HTTP %s; diagnostic response: %s',exc.code,evidence['response_excerpt'][:1500])
         raise

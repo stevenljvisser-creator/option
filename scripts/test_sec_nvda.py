@@ -1,7 +1,11 @@
 import unittest
-from sec_nvda import records,CIK
+from sec_nvda import records,CIK,make_user_agent
 
 class QuarterTests(unittest.TestCase):
+    def test_contact_is_configurable_and_placeholder_is_rejected(self):
+        self.assertEqual(make_user_agent('research@example.org'),'OptionEdge stevenljvisser-creator/option research@example.org')
+        for invalid in (None,'','<MIJN_EMAILADRES>','x@example.org\r\nInjected: x'):
+            with self.assertRaises(ValueError):make_user_agent(invalid)
     def payload(self):
         base={'end':'2025-04-27','filed':'2025-05-28','form':'10-Q','accn':'abc','fy':2026,'fp':'Q1'}
         facts={'cik':int(CIK),'facts':{'us-gaap':{'EarningsPerShareDiluted':{'units':{'USD/shares':[
